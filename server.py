@@ -1,8 +1,12 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS   # 🧩 Import CORS
 import tempfile, os
 from faster_whisper import WhisperModel
 
 app = Flask(__name__)
+
+# ✅ Enable CORS for localhost:8100 (Ionic dev) and your future production domain
+CORS(app, origins=["http://localhost:8100", "https://your-production-domain.com"])
 
 # Use the lightest model possible
 model = WhisperModel("tiny", device="cpu", compute_type="int8")
@@ -11,7 +15,7 @@ model = WhisperModel("tiny", device="cpu", compute_type="int8")
 def transcribe():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
-    
+
     audio = request.files["file"]
     with tempfile.NamedTemporaryFile(suffix=".webm") as temp_audio:
         audio.save(temp_audio.name)
