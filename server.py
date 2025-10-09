@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
-import whisper
-import tempfile
-import os
+import tempfile, os
+from faster_whisper import WhisperModel
 
 app = Flask(__name__)
-model = whisper.load_model("base")  # You can change to "small" for faster loading
+
+# Use the lightest model possible
+model = WhisperModel("tiny", device="cpu", compute_type="int8")
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
@@ -14,13 +15,14 @@ def transcribe():
     audio = request.files["file"]
     with tempfile.NamedTemporaryFile(suffix=".wav") as temp_audio:
         audio.save(temp_audio.name)
-        result = model.transcribe(temp_audio.name)
-        return jsonify({"text": result["text"]})
+        segments, info = model.transcribe(temp_audio.name)
+        text = " ".join([segment.text for segment in segments])
+        return jsonify({"text": text})
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
-    return "✅ Whisper Backend is Running"
+    return "✅ Faster Whisper Backend is Running"
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
