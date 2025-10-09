@@ -13,7 +13,7 @@ def transcribe():
         return jsonify({"error": "No file uploaded"}), 400
     
     audio = request.files["file"]
-    with tempfile.NamedTemporaryFile(suffix=".wav") as temp_audio:
+    with tempfile.NamedTemporaryFile(suffix=".webm") as temp_audio:
         audio.save(temp_audio.name)
         segments, info = model.transcribe(temp_audio.name)
         text = " ".join([segment.text for segment in segments])
