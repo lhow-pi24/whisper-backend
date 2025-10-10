@@ -31,6 +31,7 @@ def transcribe():
             process = subprocess.run(
                 [
                     "ffmpeg", "-y",
+                    "-f", "webm",
                     "-i", "pipe:0",     # read from stdin
                     "-ar", "16000",     # sample rate
                     "-ac", "1",         # mono
