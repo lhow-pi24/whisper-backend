@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tempfile, os
+import subprocess
 import ffmpeg
 from faster_whisper import WhisperModel
 
@@ -21,10 +22,15 @@ def transcribe():
             audio.save(temp_audio.name)
             wav_path = temp_audio.name.replace(".webm", ".wav")
 
-            # ✅ Convert using ffmpeg-python (works in Render)
-            ffmpeg.input(temp_audio.name).output(
-                wav_path, ar=16000, ac=1, format="wav"
-            ).overwrite_output().run(quiet=True)
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", temp_audio.name, "-ar", "16000", "-ac", "1", wav_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            if result.returncode != 0:
+                print("🔴 FFmpeg error:", result.stderr.decode())
+                return jsonify({"error": "FFmpeg failed", "details": result.stderr.decode()}), 500
 
             segments, info = model.transcribe(wav_path)
             text = " ".join([segment.text for segment in segments])
@@ -35,6 +41,7 @@ def transcribe():
             return jsonify({"text": text})
 
     except Exception as e:
+        print("❌ Exception:", str(e))
         return jsonify({"error": str(e)}), 500
 
 
