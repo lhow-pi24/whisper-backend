@@ -1,12 +1,10 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS   # 🧩 Import CORS
+from flask_cors import CORS   # ✅ Add this
 import tempfile, os
 from faster_whisper import WhisperModel
 
 app = Flask(__name__)
-
-# ✅ Enable CORS for localhost:8100 (Ionic dev) and your future production domain
-CORS(app, origins=["http://localhost:8100", "https://your-production-domain.com"])
+CORS(app)  # ✅ Enable CORS for all routes
 
 # Use the lightest model possible
 model = WhisperModel("tiny", device="cpu", compute_type="int8")
