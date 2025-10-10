@@ -26,6 +26,55 @@ def transcribe():
     audio = request.files["file"]
 
     try:
+        # Save the uploaded blob to temp file
+        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_in:
+            audio.save(temp_in.name)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_out:
+            # ✅ FIXED: let ffmpeg auto-detect input
+            process = subprocess.run(
+                [
+                    "ffmpeg", "-y",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-i", temp_in.name,
+                    "-acodec", "pcm_s16le",
+                    "-ar", "16000",
+                    "-ac", "1",
+                    temp_out.name,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            if process.returncode != 0:
+                print("🔴 FFmpeg error:\n", process.stderr.decode())
+                return jsonify({"error": "FFmpeg failed", "details": process.stderr.decode()}), 500
+
+            # Run Whisper transcription
+            segments, info = model.transcribe(temp_out.name)
+            text = " ".join([segment.text for segment in segments])
+
+            os.remove(temp_in.name)
+            os.remove(temp_out.name)
+
+            print("✅ Transcription success:", text[:60])
+            return jsonify({"text": text})
+
+    except Exception as e:
+        print("❌ Exception during transcription:", str(e))
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+    if not model:
+        return jsonify({"error": "Model not loaded"}), 500
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    audio = request.files["file"]
+
+    try:
         # 🪣 Save uploaded file first
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_in:
             audio.save(temp_in.name)
