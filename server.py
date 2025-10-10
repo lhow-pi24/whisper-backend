@@ -30,10 +30,16 @@ def transcribe():
         return jsonify({"error": "No file selected"}), 400
 
     try:
-        # Save uploaded file to temporary file first
+        # Save uploaded file
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_input:
             audio.save(temp_input.name)
             temp_input_path = temp_input.name
+
+        # Validate
+        if not os.path.exists(temp_input_path) or os.path.getsize(temp_input_path) < 1000:
+            print("❌ Received invalid or empty audio file")
+            return jsonify({"error": "Uploaded file is empty or corrupted"}), 400
+
 
         # Convert to WAV using FFmpeg
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_output:
@@ -42,13 +48,10 @@ def transcribe():
         try:
             # FFmpeg command to convert WebM to WAV
             ffmpeg_cmd = [
-                "ffmpeg", "-y",
-                "-i", temp_input_path,  # Input file
-                "-ar", "16000",         # Sample rate
-                "-ac", "1",             # Mono
-                "-acodec", "pcm_s16le", # Audio codec
-                "-f", "wav",            # Output format
-                temp_output_path
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-y", "-f", "webm", "-i", temp_input_path,
+                "-ar", "16000", "-ac", "1",
+                "-acodec", "pcm_s16le", "-f", "wav", temp_output_path
             ]
 
             process = subprocess.run(
