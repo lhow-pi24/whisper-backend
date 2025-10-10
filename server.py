@@ -26,41 +26,36 @@ def transcribe():
     audio = request.files["file"]
 
     try:
-        # Save webm file temporarily
-        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_audio:
-            audio.save(temp_audio.name)
-            wav_path = temp_audio.name.replace(".webm", ".wav")
-
-            # Convert to wav using ffmpeg
-            result = subprocess.run(
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
+            # 🪄 Convert directly from stdin -> wav
+            process = subprocess.run(
                 [
                     "ffmpeg", "-y",
-                    "-i", temp_audio.name,
-                    "-ar", "16000", "-ac", "1",
-                    wav_path
+                    "-i", "pipe:0",     # read from stdin
+                    "-ar", "16000",     # sample rate
+                    "-ac", "1",         # mono
+                    "-f", "wav",        # output format
+                    temp_wav.name
                 ],
+                input=audio.read(),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
 
-            if result.returncode != 0:
-                print("🔴 FFmpeg error:\n", result.stderr.decode())
-                return jsonify({"error": "FFmpeg failed", "details": result.stderr.decode()}), 500
+            if process.returncode != 0:
+                print("🔴 FFmpeg error:\n", process.stderr.decode())
+                return jsonify({"error": "FFmpeg failed", "details": process.stderr.decode()}), 500
 
-            # Transcribe
-            segments, info = model.transcribe(wav_path)
+            # 🧠 Transcribe
+            segments, info = model.transcribe(temp_wav.name)
             text = " ".join([segment.text for segment in segments])
 
-            # Clean up
-            os.remove(temp_audio.name)
-            os.remove(wav_path)
-
+            os.remove(temp_wav.name)
             print("✅ Transcription success:", text[:60])
             return jsonify({"text": text})
 
     except Exception as e:
         print("❌ Exception during transcription:", str(e))
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
