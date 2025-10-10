@@ -1,3 +1,4 @@
+#server.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tempfile, os
@@ -23,7 +24,11 @@ def transcribe():
             wav_path = temp_audio.name.replace(".webm", ".wav")
 
             result = subprocess.run(
-                ["ffmpeg", "-y", "-i", temp_audio.name, "-ar", "16000", "-ac", "1", wav_path],
+                ["ffmpeg", "-y",
+                    "-f", "webm",
+                    "-c:a", "libopus",
+                    "-i", temp_audio.name,
+                    "-ar", "16000", "-ac", "1", wav_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
