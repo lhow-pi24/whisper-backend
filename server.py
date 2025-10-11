@@ -47,28 +47,39 @@ def handle_disconnect():
 @socketio.on("audio_chunk")
 def handle_audio_chunk(data):
     """
-    Expects base64-encoded audio chunk (WebM or WAV)
+    Receives base64 audio chunk (WebM or WAV) from the client,
+    converts it with ffmpeg, then transcribes.
     """
     try:
-        # Decode the base64 audio data
         audio_bytes = base64.b64decode(data)
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_input:
+
+        # Save base64 chunk to .webm file
+        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_input:
             temp_input.write(audio_bytes)
             temp_input_path = temp_input.name
 
-        # 🔍 Transcribe using Whisper
-        segments, _ = model.transcribe(
-            temp_input_path,
-            beam_size=3,
-            best_of=3,
-            condition_on_previous_text=False
-        )
+        # Convert WebM → WAV
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_output:
+            temp_output_path = temp_output.name
 
-        # Combine text
+        ffmpeg_cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-y", "-i", temp_input_path,
+            "-ar", "16000", "-ac", "1",
+            "-acodec", "pcm_s16le", temp_output_path
+        ]
+
+        result = subprocess.run(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if result.returncode != 0:
+            print("🔴 FFmpeg conversion failed:")
+            print(result.stderr.decode())
+            return
+
+        # ✅ Now transcribe clean WAV
+        segments, _ = model.transcribe(temp_output_path)
         text = " ".join([s.text for s in segments]).strip()
-        os.remove(temp_input_path)
 
-        # Send result to all clients
         if text:
             emit("transcript", {"text": text}, broadcast=True)
             print(f"🗣 {text}")
@@ -76,6 +87,16 @@ def handle_audio_chunk(data):
     except Exception as e:
         print(f"❌ Error in handle_audio_chunk: {e}")
         traceback.print_exc()
+    finally:
+        # Cleanup
+        try:
+            if os.path.exists(temp_input_path):
+                os.remove(temp_input_path)
+            if os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+        except Exception:
+            pass
+
 
 
 # -------------------------------
