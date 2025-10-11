@@ -2,3 +2,7 @@ flask
 flask-cors
 faster-whisper
 ffmpeg-python
+flask-socketio
+gevent
+gevent-websocket
+
